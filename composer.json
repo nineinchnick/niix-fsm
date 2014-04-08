@@ -1,0 +1,20 @@
+{
+    "name": "nineinchnick/niix-fsm",
+    "description": "Extensions to the Yii PHP framework providing tools for switching status of an AR model.",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Jan Waś",
+            "email": "jwas@nets.com.pl"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "http://git.nets.com.pl/git/niix.git"
+        }
+    ],
+    "require": {
+        "nineinchnick/niix": "1.0.*"
+    }
+}
