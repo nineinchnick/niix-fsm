@@ -10,6 +10,9 @@
  * * attach the fsm behavior to the model
  * * call StateAction::getContextMenuItem when building the context menu in CRUD controller
  *
+ * @todo decide how to represent the State data structure to fetch labels for the 'confirm' view
+ * @todo fix default view styling
+ *
  * @author Jan Was <jwas@nets.com.pl>
  */
 class StateAction extends CAction
@@ -135,7 +138,7 @@ class StateAction extends CAction
 
             $valid = !$enabled || $model->isTransitionAllowed($targetState);
 
-			$urlParams = array('id' => $model->id, 'state' => $targetState);
+			$urlParams = array('id' => $model->id, 'targetState' => $targetState);
 			if (!$state->confirmation_required) {
 				$urlParams['confirmed'] = true;
 			} else {
@@ -196,7 +199,7 @@ class StateAction extends CAction
                     $enabled = ($enabled === null || $enabled) && $status;
                 //}
             }
-            $url = array($action->id, 'id' => $model->primaryKey, 'state' => $targetState);
+            $url = array('state', 'id' => $model->primaryKey, 'targetState' => $targetState);
             $statusMenu['items'][] = array(
                 'label'		=> $state->label,
                 'icon'		=> $state->icon,
