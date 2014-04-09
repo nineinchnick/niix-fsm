@@ -5,6 +5,7 @@
  * It requires to be used by a NetController class.
  *
  * Installation steps:
+ * * copy the views into the controller's viewPath
  * * if required, call the fsm console command to generate migrations, run them and create two models
  * * attach the fsm behavior to the model
  * * call StateAction::getContextMenuItem when building the context menu in CRUD controller
@@ -31,17 +32,17 @@ class StateAction extends CAction
 	 */
 	public function run($id, $targetState = null, $confirmed = false)
 	{
-        $this->controller->viewPath = Yii::getPathOfAlias('fsm.views');
-
-        $model = $this->loadModel($id, $this->controller->modelClass);
+        $model = $this->controller->loadModel($id, $this->controller->modelClass);
         if ($this->controller->checkAccessInActions && !Yii::app()->user->checkAccess($this->stateAuthItem.$this->controller->authModelClass, array('model'=>$model))) {
             throw new CHttpException(403,Yii::t('app','You are not authorized to perform this action on this object.'));
         }
 
         $behavior = $model->asa('fsm');
-        $stateAttribute = $behavior->attribute;
-        $transitionsModel = CActiveRecord::model($behavior->transitionsModelClass);
-        $stateChanges = self::getGroupedBySource($transitionsModel);
+        if (!$model instanceof IStateful) {
+            throw new CHttpException(500,Yii::t('app', 'Model {model} needs to implement the IStateful interface.', array('{model}'=>$this->controller->modelClass)));
+        }
+        $stateAttribute = $model->stateAttributeName;
+        $stateChanges = $model->getTransitionsGroupedBySource();
 
 
         $uiType = $model->uiType($stateAttribute);
@@ -55,19 +56,12 @@ class StateAction extends CAction
 
         if ($targetState === null) {
             // display all possible state transitions to select from
-			$this->render('state', array(
+			$this->controller->render('state', array(
 				'model'         => $model,
                 'targetState'   => null,
-				'states'        => $this->prepareStates($model, $stateAttribute, $transitionsModel),
+				'states'        => $this->prepareStates($model),
 			));
-		} elseif ($targetState === $sourceState) {
-            Yii::app()->user->setFlash('error', Yii::t('app', 'Status has already been changed').', '.CHtml::link(Yii::t('app','return to'), $this->createUrl('view', array('id'=>$model->id))));
-			$this->render('confirm', array(
-				'model'         => $model,
-				'sourceState'   => $sourceState,
-				'targetState'   => $targetState,
-                'format'        => $uiType,
-			));
+            Yii::app()->end();
 		} else if ((!is_callable($this->isAdminCallback) || !call_user_func($this->isAdminCallback)) && !isset($stateChanges[$sourceState]['targets'][$targetState])) {
 			$sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
 			$targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
@@ -89,7 +83,7 @@ class StateAction extends CAction
             Yii::app()->end();
         }
 
-        $this->render('confirm', array(
+        $this->controller->render('confirm', array(
             'model'         => $model,
             'sourceState'   => $sourceState,
             'targetState'   => $targetState,
@@ -100,11 +94,9 @@ class StateAction extends CAction
 	/**
 	 * Builds an array containing all possible status changes and result of validating every transition.
 	 * @params mixed $model
-	 * @params string $attribute
-     * @params mixed $transitionsModel
 	 * @return array contains in order: (array)statuses, (boolean)valid
 	 */
-    public function prepareStates($model, $attribute, $transitionsModel)
+    public function prepareStates($model)
     {
 		$checkedAccess = array();
         if ($this->updateAuthItem !== null) {
@@ -115,21 +107,23 @@ class StateAction extends CAction
             $result[] = array(
 				'label' => Yii::t('app', 'Update item'),
 				'icon' => 'pencil',
-				'url' => array('update', 'id' => $model->getPrimaryKey()),
+				'url' => $this->controller->createUrl('update', array('id' => $model->getPrimaryKey())),
 				'enabled' => $checkedAccess[$this->updateAuthItem.$this->controller->authModelClass],
-				'class' => 'btn-success',
+				'class' => 'btn btn-success',
 			);
         }
 		$valid = true;
+        $attribute = $model->stateAttributeName;
         $sourceState = $model->$attribute;
-        foreach(self::getGroupedByTarget($transitionsModel) as $targetState => $target) {
+        foreach($model->getTransitionsGroupedByTarget() as $targetState => $target) {
             $state = $target['state'];
             $sources = $target['sources'];
 
 			if (!isset($sources[$sourceState])) continue;
 
 			$enabled = null;
-			foreach($sources[$sourceState] as $sourceStateObject) {
+            $sourceStateObject = $sources[$sourceState];
+			//foreach($sources[$sourceState] as $sourceStateObject) {
                 $authItem = $sourceStateObject->auth_item_name;
 				if (isset($checkedAccess[$authItem])) {
 					$status = $checkedAccess[$authItem];
@@ -137,7 +131,7 @@ class StateAction extends CAction
 					$status = $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
 				}
 				$enabled = ($enabled === null || $enabled) && $status;
-			}
+			//}
 
             $valid = !$enabled || $model->isTransitionAllowed($targetState);
 
@@ -148,17 +142,17 @@ class StateAction extends CAction
 				$urlParams['return'] = $this->id;
 			}
             $entry = array(
-                'post'      => $targetState->post_label,
+                'post'      => $state->post_label,
                 'label'     => $sources[$sourceState]->label,
-                'icon'      => $states[$targetState]->icon,
-                'class'     => $states[$targetState]->css_class,
+                'icon'      => $state->icon,
+                'class'     => $state->css_class,
                 'target'    => $targetState,
-                'enabled'   => $enabled && $allDocsValidates && $allAttachValidates,
+                'enabled'   => $enabled && $valid,
                 'valid'     => $valid,
-                'url'       => $this->createUrl($this->id, $urlParams),
+                'url'       => $this->controller->createUrl($this->id, $urlParams),
             );
-            if ($targetState->display_order) {
-                $result[$targetState->display_order] = $entry;
+            if ($state->display_order) {
+                $result[$state->display_order] = $entry;
             } else {
                 $result[] = $entry;
             }
@@ -166,39 +160,6 @@ class StateAction extends CAction
 		ksort($result);
 		return $result;
 	}
-
-    protected static function getGroupedBySource($transitionsModel)
-    {
-        $transitions = $transitionsModel->enabled()->findAll();
-        $result = array();
-        foreach($transitions as $transition) {
-            if (!isset($result[$transition->source_status_id])) {
-                $result[$transition->source_status_id] = array('state' => $transition, 'targets' => array());
-            }
-            $result[$transition->source_status_id]['targets'][$transition->target_status_id] = $transition;
-        }
-        return $result;
-    }
-
-    protected static function getGroupedByTarget($transitionsModel)
-    {
-        $transitions = $transitionsModel->enabled()->findAll();
-        $result = array();
-        foreach($transitions as $transition) {
-            /**
-             * if there were target auth items set we would merge them with the source one
-            if (isset($result[$transition->target_status_id]) && isset($result[$transition->target_status_id][$transition->source_status_id]))
-                $result[$transition->target_status_id][$transition->source_status_id] = array($transition->auth_item_name);
-            else
-                $result[$transition->target_status_id][$transition->source_status_id] = array($transition->auth_item_name),
-             */
-            if (!isset($result[$transition->target_status_id])) {
-                $result[$transition->target_status_id] = array('state' => $transition, 'sources' => array());
-            }
-            $result[$transition->target_status_id]['sources'][$transition->source_status_id] = $transition;
-        }
-        return $result;
-    }
 
     /**
      * Builds a menu item used in the context menu.
@@ -213,17 +174,19 @@ class StateAction extends CAction
         $statusMenu = array(
             'label' => Yii::t('app', 'Status changes'),
             'icon'  => 'share',
+            'url'	=> '#',
             'items' => array(),
         );
         foreach($transitions as $targetState => $target) {
             $state = $target['state'];
-            $sources = $target['sources'];
+            $sources = $target['targets'];
 
             if (!$isAdmin && !isset($sources[$sourceState])) continue;
 
             $enabled = $isAdmin ? true : null;
             if (isset($sources[$sourceState])) {
-                foreach($sources[$sourceState] as $sourceStateObject) {
+                $sourceStateObject = $sources[$sourceState];
+                //foreach($sources[$sourceState] as $sourceStateObject) {
                     $authItem = $sourceStateObject->auth_item_name;
                     if (isset($checkedAccess[$authItem])) {
                         $status = $checkedAccess[$authItem];
@@ -231,15 +194,17 @@ class StateAction extends CAction
                         $status = $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
                     }
                     $enabled = ($enabled === null || $enabled) && $status;
-                }
+                //}
             }
-            $url = array($action, 'id' => $model->primaryKey, 'state' => $targetState);
+            $url = array($action->id, 'id' => $model->primaryKey, 'state' => $targetState);
             $statusMenu['items'][] = array(
-                'label'		=> $targetState->label,
-                'icon'		=> $targetState->icon,
+                'label'		=> $state->label,
+                'icon'		=> $state->icon,
                 'url'		=> $enabled ? $url : null,
             );
         }
+        $statusMenu['disabled'] = $model->primaryKey === null || empty($statusMenu['items']);
+        return $statusMenu;
     }
 }
 

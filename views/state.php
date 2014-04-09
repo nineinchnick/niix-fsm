@@ -15,7 +15,7 @@ $this->setPageTitle($title);
 <?php foreach($statuses as $status): ?>
 
 <?php if (!$status['enabled']): continue; ?>
-<a class="<?php echo $status['class']; ?>" href="<?php echo $status['url']; ?>" style="margin-left: 2em;">
+<a class="btn <?php echo $status['class']; ?>" href="<?php echo $status['url']; ?>" style="margin-left: 2em;">
     <i class="fa fa-<?php echo $status['icon']; ?>"></i> <?php echo $status['label']; ?>
 </a>
 <?php endforeach; ?>

@@ -22,7 +22,7 @@ $this->setPageTitle($title);
             <?php echo CHtml::textArea('reason', '', array('cols'=>80, 'rows'=>5,'style'=>'width: 25em;')); ?>
         </div>
     </div>
-    <a class="button button-success" href="<?php echo $this->createUrl($this->id, array('state'=>$targetState, 'confirmed'=>1)); ?>"><i class="fa fa-save"></i> <?php echo Yii::t('app', 'Confirm'); ?></a>
+    <a class="btn btn-success" href="<?php echo $this->createUrl($this->id, array('state'=>$targetState, 'confirmed'=>1)); ?>"><i class="fa fa-save"></i> <?php echo Yii::t('app', 'Confirm'); ?></a>
     
     <?php echo CHtml::link(Yii::t('app', 'Cancel'), $this->createUrl((isset($_GET['return'])?$_GET['return']:'view'), array('id'=>$model->primaryKey))); ?>
 </div>
