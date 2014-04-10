@@ -5,13 +5,12 @@
  * It requires to be used by a NetController class.
  *
  * Installation steps:
+ * * optionally, call the fsm console command to generate migrations, run them and create two models
+ * * implement the IStateful interface in the main model
+ * * include a new 'transition' scenario in validation rules, most often it would make a 'notes' attribute safe or even required
+ * * optionally, add an inline validator that would depend on the source state
  * * copy the views into the controller's viewPath
- * * if required, call the fsm console command to generate migrations, run them and create two models
- * * attach the fsm behavior to the model
  * * call StateAction::getContextMenuItem when building the context menu in CRUD controller
- *
- * @todo decide how to represent the State data structure to fetch labels for the 'confirm' view
- * @todo fix default view styling
  *
  * @author Jan Was <jwas@nets.com.pl>
  */
@@ -36,11 +35,11 @@ class StateAction extends CAction
 	public function run($id, $targetState = null, $confirmed = false)
 	{
         $model = $this->controller->loadModel($id, $this->controller->modelClass);
+        $model->scenario = IStateful::SCENARIO;
         if ($this->controller->checkAccessInActions && !Yii::app()->user->checkAccess($this->stateAuthItem.$this->controller->authModelClass, array('model'=>$model))) {
             throw new CHttpException(403,Yii::t('app','You are not authorized to perform this action on this object.'));
         }
 
-        $behavior = $model->asa('fsm');
         if (!$model instanceof IStateful) {
             throw new CHttpException(500,Yii::t('app', 'Model {model} needs to implement the IStateful interface.', array('{model}'=>$this->controller->modelClass)));
         }
@@ -51,15 +50,12 @@ class StateAction extends CAction
         $uiType = $model->uiType($stateAttribute);
         $sourceState = $model->$stateAttribute;
         if (!isset($stateChanges[$sourceState])) {
-            $stateChanges[$sourceState] = array(
-                'state' => null,
-                'targets' => array(),
-            );
+            $stateChanges[$sourceState] = array('state' => null, 'targets' => array());
         }
 
         if ($targetState === null) {
             // display all possible state transitions to select from
-			$this->controller->render('state', array(
+			$this->controller->render('fsm_state', array(
 				'model'         => $model,
                 'targetState'   => null,
 				'states'        => $this->prepareStates($model),
@@ -75,21 +71,29 @@ class StateAction extends CAction
 			throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array('{from}'=>$sourceLabel, '{to}'=>$targetLabel)));
 		}
 
+        $model->setTransitionRules($targetState);
+
 		if ($targetState === $sourceState) {
             Yii::app()->user->setFlash('error', Yii::t('app', 'Status has already been changed').', '.CHtml::link(Yii::t('app','return to'), $this->createUrl('view', array('id'=>$model->id))));
         } elseif ($confirmed && $model->isTransitionAllowed($targetState)) {
-            if (!$model->performTransition($targetState, isset($_REQUEST['reason']) && ($reason=trim($_REQUEST['reason']))!=='' ? $reason : null)) {
-                Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to update status. Administrator has been notified.'));
+            $oldAttributes = $model->getAttributes();
+            $data = $this->controller->processForm($model);
+            // explicitly assign the new state value to avoid forcing the state attribute to be safe
+            $model->{$model->getStateAttributeName()} = $targetState;
+
+            if ($model->performTransition($oldAttributes)) {
+                Yii::app()->user->setFlash('success', $stateChanges[$sourceState]['targets'][$targetState]->post_label);
+                $this->redirect(array('view', 'id'=>$model->id));
+                Yii::app()->end();
             }
-            Yii::app()->user->setFlash('success', $stateChanges[$sourceState]['targets'][$targetState]->post_label);
-            $this->redirect(array('view', 'id'=>$model->id));
-            Yii::app()->end();
+            Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
         }
 
-        $this->controller->render('confirm', array(
+        $this->controller->render('fsm_confirm', array(
             'model'         => $model,
             'sourceState'   => $sourceState,
             'targetState'   => $targetState,
+            'transition'    => $stateChanges[$sourceState]['targets'][$targetState],
             'format'        => $uiType,
         ));
 	}

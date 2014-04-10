@@ -2,6 +2,7 @@
 
 interface IStateful
 {
+    const SCENARIO = 'transition';
     /**
      * Returns all possible state transitions as an array of items like:
      *   array('state'=>StateTransition, 'targets'=>StateTransition[]).
@@ -20,19 +21,24 @@ interface IStateful
      */
     public function getStateAttributeName();
     /**
+     * This method is called to verify that a transition is enabled. Using this method could be simpler
+     * than attaching bizRules to auth items assigned to state transitions.
      * @param $targetState mixed
      * @return boolean
      */
     public function isTransitionAllowed($targetState);
     /**
-     * Besides simply updating the state attribute's value this method could also:
-     * * save the change reason
-     * * log the change
-     * * raise events
+     * Similar to save(), it validates and then saves attributes marked as safe in the IStateful::SCENARIO.
+     * Besides that it could also log the change and/or raise events.
      *
-     * @param $targetState mixed
-     * @param $reason string
+     * @param $oldAttributes array
      * @return boolean
      */
-    public function performTransition($targetState, $reason=null);
+    public function performTransition($oldAttributes);
+    /**
+     * Modifies validators list obtained through getValidators() adding rules for a specific transition.
+     * @param $targetState mixed
+     * @return 
+     */
+    public function setTransitionRules($targetState);
 }
