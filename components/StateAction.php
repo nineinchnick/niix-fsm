@@ -83,7 +83,7 @@ class StateAction extends CAction
 
             if ($model->performTransition($oldAttributes)) {
                 Yii::app()->user->setFlash('success', $stateChanges[$sourceState]['targets'][$targetState]->post_label);
-                $this->redirect(array('view', 'id'=>$model->id));
+                $this->controller->redirect(array('view', 'id'=>$model->id));
                 Yii::app()->end();
             }
             Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
