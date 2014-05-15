@@ -27,10 +27,10 @@ class StateTransition extends CComponent
                 $transition = new StateTransition;
                 $transition->source_state = $states[$i]->id;
                 $transition->target_state = $states[$j]->id;
-                $transition->label = $states[$j]->pre_label;
-                $transition->post_label = $states[$j]->post_label;
-                $transition->icon = $states[$j]->icon;
-                $transition->css_class = $states[$j]->css_class;
+                $transition->label = isset($states[$j]->pre_label) ? $states[$j]->pre_label : (string)$states[$j];
+                $transition->post_label = isset($states[$j]->post_label) ? $states[$j]->post_label : (string)$states[$j];
+                $transition->icon = isset($states[$j]->icon) ? $states[$j]->icon : null;
+                $transition->css_class = isset($states[$j]->css_class) ? $states[$j]->css_class : null;
                 $result[] = $transition;
             }
         }

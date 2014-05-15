@@ -186,7 +186,7 @@ class StateAction extends CAction
         );
         foreach($transitions as $targetState => $target) {
             $state = $target['state'];
-            $sources = $target['targets'];
+            $sources = $target['sources'];
 
             if (!$isAdmin && !isset($sources[$sourceState])) continue;
 
