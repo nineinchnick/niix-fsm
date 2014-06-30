@@ -1,8 +1,8 @@
-<?php /*
-@var $this NetController
-@var $model NetActiveRecord
-@var $targetState mixed
- */
+<?php
+/* @var $this NetController */
+/* @var $model NetActiveRecord */
+/* @var $targetState mixed */
+
 $this->buildNavigation($this->action, $model);
 $title = Yii::t('app', 'Status').' '.CHtml::encode($model->label()).' '.CHtml::encode($model);
 $this->setPageTitle($title);
