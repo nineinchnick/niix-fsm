@@ -12,3 +12,6 @@ Provides:
 Requires:
 * niix
 
+## Todo
+
+* group state transition logic into named workflows
