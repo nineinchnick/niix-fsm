@@ -37,9 +37,11 @@ composer require nineinchnick/niix-fsm:dev-master
 
 Define the `fsm` alias in application configuration file as `'fsm' => 'application.vendor.nineinchnick.niix-fsm'`.
 
-Implement the `IStateful` interface in selected AR model. You might want to add `Yii::import('fsm.components.*')` at the top of the file.
+## Usage
 
-In the controller, add the `state` action and include it in the context menu, adjust according to comments:
+* Implement the `IStateful` interface in selected AR model. You might want to add `Yii::import('fsm.components.*')` at the top of the file.
+* Adjust rules to remove attributes from the `transition` scenario. The `NetActiveRecord.filterRules()` helper method should be used for that.
+* In the controller, add the `state` action and include it in the context menu, adjust according to comments:
 
 ~~~php
 
