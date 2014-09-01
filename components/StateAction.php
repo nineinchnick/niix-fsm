@@ -19,11 +19,11 @@ class StateAction extends CAction
     /**
      * @var string Prefix of the auth item used to check access. Controller's $authModelClass is appended to it.
      */
-    public $stateAuthItem = 'update ';
+    public $stateAuthItemTemplate = '{modelClass}.update';
     /**
      * @var string Auth item used to check access to update the main model. If null, the update button won't be available.
      */
-    public $updateAuthItem;
+    public $updateAuthItemTemplate;
     /**
      * @var callable a closure to check if current user is a superuser and authorization should be skipped
      */
@@ -36,7 +36,8 @@ class StateAction extends CAction
 	{
         $model = $this->controller->loadModel($id, $this->controller->modelClass);
         $model->scenario = IStateful::SCENARIO;
-        if ($this->controller->checkAccessInActions && !Yii::app()->user->checkAccess($this->stateAuthItem.$this->controller->authModelClass, array('model'=>$model))) {
+        $authItem = strtr($this->stateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
+        if ($this->controller->checkAccessInActions && !Yii::app()->user->checkAccess($authItem, array('model'=>$model))) {
             throw new CHttpException(403,Yii::t('app','You are not authorized to perform this action on this object.'));
         }
 
@@ -106,16 +107,18 @@ class StateAction extends CAction
     public function prepareStates($model)
     {
 		$checkedAccess = array();
-        if ($this->updateAuthItem !== null) {
-            $checkedAccess[$this->updateAuthItem.$this->controller->authModelClass] = Yii::app()->user->checkAccess($this->updateAuthItem.$this->controller->authModelClass, array('model'=>$model));
+        if ($this->updateAuthItemTemplate !== null) {
+            $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
+            $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
         }
 		$result = array();
-        if ($this->updateAuthItem !== null) {
+        if ($this->updateAuthItemTemplate !== null) {
+            $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
             $result[] = array(
 				'label' => Yii::t('app', 'Update item'),
 				'icon' => 'pencil',
 				'url' => $this->controller->createUrl('update', array('id' => $model->getPrimaryKey())),
-				'enabled' => $checkedAccess[$this->updateAuthItem.$this->controller->authModelClass],
+				'enabled' => $checkedAccess[$authItem],
 				'class' => 'btn btn-success',
 			);
         }
