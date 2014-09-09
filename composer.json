@@ -15,6 +15,5 @@
         }
     ],
     "require": {
-        "nineinchnick/niix": "1.0.*"
     }
 }
