@@ -54,6 +54,8 @@ class StateAction extends CAction
             $stateChanges[$sourceState] = array('state' => null, 'targets' => array());
         }
 
+        $this->controller->initForm($model);
+
         if ($targetState === null) {
             // display all possible state transitions to select from
 			$this->controller->render('fsm_state', array(
