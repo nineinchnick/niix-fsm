@@ -84,12 +84,14 @@ class StateAction extends CAction
             // explicitly assign the new state value to avoid forcing the state attribute to be safe
             $model->{$model->getStateAttributeName()} = $targetState;
 
-            if ($model->performTransition($oldAttributes)) {
-                Yii::app()->user->setFlash('success', $stateChanges[$sourceState]['targets'][$targetState]->post_label);
-                $this->controller->redirect(array('view', 'id'=>$model->id));
-                Yii::app()->end();
+            if($model->validate(array($model->getStateAttributeName()))) {
+                if ($model->performTransition($oldAttributes)) {
+                    Yii::app()->user->setFlash('success', $stateChanges[$sourceState]['targets'][$targetState]->post_label);
+                    $this->controller->redirect(array('view', 'id'=>$model->id));
+                    Yii::app()->end();
+                }
+                Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
             }
-            Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
         }
 
         $this->controller->render('fsm_confirm', array(
