@@ -8,7 +8,7 @@ $title = Yii::t('app', 'Status').' '.CHtml::encode($model->label()).' '.CHtml::e
 $this->setPageTitle($title);
 ?>
 
-<?php $this->widget('niix.components.NetAlert'); ?>
+<?php $this->widget('niix-utils.components.NetAlert'); ?>
 
 <?php echo Yii::t('app', 'Change status from {source} to {target}', array(
     '{source}' => '<span class="badge badge-default">'.Yii::app()->format->format($sourceState, $format).'</span>',
