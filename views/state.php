@@ -9,7 +9,7 @@ $title = Yii::t('app', 'Status') . ' ' . CHtml::encode($model->label()) . ' ' . 
 $this->setPageTitle($title);
 ?>
 
-<?php $this->widget('niix.components.NetAlert'); ?>
+<?php $this->widget('niix-utils.components.NetAlert'); ?>
 
 <div>
     <?php foreach($statuses as $status): ?>
