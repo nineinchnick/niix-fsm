@@ -32,9 +32,10 @@ interface IStateful
      * Besides that it could also log the change and/or raise events.
      *
      * @param $oldAttributes array
+     * @param $data array
      * @return boolean
      */
-    public function performTransition($oldAttributes);
+    public function performTransition($oldAttributes, $data);
     /**
      * Modifies validators list obtained through getValidators() adding rules for a specific transition.
      * @param $targetState mixed
