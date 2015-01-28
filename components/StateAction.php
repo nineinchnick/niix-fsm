@@ -29,11 +29,11 @@ class StateAction extends CAction
      */
     public $isAdminCallback;
 
-	/**
-	 * Runs the action.
-	 */
-	public function run($id, $targetState = null, $confirmed = false)
-	{
+    /**
+     * Runs the action.
+     */
+    public function run($id, $targetState = null, $confirmed = false)
+    {
         $model = $this->controller->loadModel($id, $this->controller->modelClass);
         $model->scenario = IStateful::SCENARIO;
         $authItem = strtr($this->stateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
@@ -58,25 +58,25 @@ class StateAction extends CAction
 
         if ($targetState === null) {
             // display all possible state transitions to select from
-			$this->controller->render('fsm_state', array(
-				'model'         => $model,
+            $this->controller->render('fsm_state', array(
+                'model'         => $model,
                 'targetState'   => null,
-				'states'        => $this->prepareStates($model),
-			));
+                'states'        => $this->prepareStates($model),
+            ));
             Yii::app()->end();
-		} else if ((!is_callable($this->isAdminCallback) || !call_user_func($this->isAdminCallback)) && !isset($stateChanges[$sourceState]['targets'][$targetState])) {
-			$sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
-			$targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
-			throw new CHttpException(400, Yii::t('app', 'Changing application status from {from} to {to} is not allowed.', array('{from}'=>$sourceLabel,'{to}'=>$targetLabel)));
-		} else if (isset($stateChanges[$sourceState]['state']->auth_item_name) && !Yii::app()->user->checkAccess($stateChanges[$sourceState]['state']->auth_item_name, array('model'=>$model))) {
-			$sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
-			$targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
-			throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array('{from}'=>$sourceLabel, '{to}'=>$targetLabel)));
-		}
+        } else if ((!is_callable($this->isAdminCallback) || !call_user_func($this->isAdminCallback)) && !isset($stateChanges[$sourceState]['targets'][$targetState])) {
+            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
+            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
+            throw new CHttpException(400, Yii::t('app', 'Changing application status from {from} to {to} is not allowed.', array('{from}'=>$sourceLabel,'{to}'=>$targetLabel)));
+        } else if (isset($stateChanges[$sourceState]['state']->auth_item_name) && !Yii::app()->user->checkAccess($stateChanges[$sourceState]['state']->auth_item_name, array('model'=>$model))) {
+            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
+            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
+            throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array('{from}'=>$sourceLabel, '{to}'=>$targetLabel)));
+        }
 
         $model->setTransitionRules($targetState);
 
-		if ($targetState === $sourceState) {
+        if ($targetState === $sourceState) {
             Yii::app()->user->setFlash('error', Yii::t('app', 'Status has already been changed').', '.CHtml::link(Yii::t('app','return to'), $this->createUrl('view', array('id'=>$model->id))));
         } elseif ($confirmed && $model->isTransitionAllowed($targetState)) {
             $oldAttributes = $model->getAttributes();
@@ -102,60 +102,60 @@ class StateAction extends CAction
             'transition'    => $stateChanges[$sourceState]['targets'][$targetState],
             'format'        => $uiType,
         ));
-	}
+    }
 
-	/**
-	 * Builds an array containing all possible status changes and result of validating every transition.
-	 * @params mixed $model
-	 * @return array contains in order: (array)statuses, (boolean)valid
-	 */
+    /**
+     * Builds an array containing all possible status changes and result of validating every transition.
+     * @params mixed $model
+     * @return array contains in order: (array)statuses, (boolean)valid
+     */
     public function prepareStates($model)
     {
-		$checkedAccess = array();
+        $checkedAccess = array();
         if ($this->updateAuthItemTemplate !== null) {
             $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
             $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
         }
-		$result = array();
+        $result = array();
         if ($this->updateAuthItemTemplate !== null) {
             $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
             $result[] = array(
-				'label' => Yii::t('app', 'Update item'),
-				'icon' => 'pencil',
-				'url' => $this->controller->createUrl('update', array('id' => $model->getPrimaryKey())),
-				'enabled' => $checkedAccess[$authItem],
-				'class' => 'btn btn-success',
-			);
+                'label' => Yii::t('app', 'Update item'),
+                'icon' => 'pencil',
+                'url' => $this->controller->createUrl('update', array('id' => $model->getPrimaryKey())),
+                'enabled' => $checkedAccess[$authItem],
+                'class' => 'btn btn-success',
+            );
         }
-		$valid = true;
+        $valid = true;
         $attribute = $model->stateAttributeName;
         $sourceState = $model->$attribute;
         foreach($model->getTransitionsGroupedByTarget() as $targetState => $target) {
             $state = $target['state'];
             $sources = $target['sources'];
 
-			if (!isset($sources[$sourceState])) continue;
+            if (!isset($sources[$sourceState])) continue;
 
-			$enabled = null;
+            $enabled = null;
             $sourceStateObject = $sources[$sourceState];
-			//foreach($sources[$sourceState] as $sourceStateObject) {
-                $authItem = $sourceStateObject->auth_item_name;
-				if (isset($checkedAccess[$authItem])) {
-					$status = $checkedAccess[$authItem];
-				} else {
-					$status = $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
-				}
-				$enabled = ($enabled === null || $enabled) && $status;
-			//}
+            //foreach($sources[$sourceState] as $sourceStateObject) {
+            $authItem = $sourceStateObject->auth_item_name;
+            if (isset($checkedAccess[$authItem])) {
+                $status = $checkedAccess[$authItem];
+            } else {
+                $status = $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
+            }
+            $enabled = ($enabled === null || $enabled) && $status;
+            //}
 
             $valid = !$enabled || $model->isTransitionAllowed($targetState);
 
-			$urlParams = array('id' => $model->id, 'targetState' => $targetState);
-			if (!$state->confirmation_required) {
-				$urlParams['confirmed'] = true;
-			} else {
-				$urlParams['return'] = $this->id;
-			}
+            $urlParams = array('id' => $model->id, 'targetState' => $targetState);
+            if (!$state->confirmation_required) {
+                $urlParams['confirmed'] = true;
+            } else {
+                $urlParams['return'] = $this->id;
+            }
             $entry = array(
                 'post'      => $state->post_label,
                 'label'     => $sources[$sourceState]->label,
@@ -171,10 +171,10 @@ class StateAction extends CAction
             } else {
                 $result[] = $entry;
             }
-		}
-		ksort($result);
-		return $result;
-	}
+        }
+        ksort($result);
+        return $result;
+    }
 
     /**
      * Builds a menu item used in the context menu.
@@ -189,7 +189,7 @@ class StateAction extends CAction
         $statusMenu = array(
             'label' => Yii::t('app', 'Status changes'),
             'icon'  => 'share',
-            'url'	=> '#',
+            'url'   => '#',
             'items' => array(),
         );
         foreach($transitions as $targetState => $target) {
@@ -213,9 +213,9 @@ class StateAction extends CAction
             }
             $url = array('state', 'id' => $model->primaryKey, 'targetState' => $targetState);
             $statusMenu['items'][] = array(
-                'label'		=> $state->label,
-                'icon'		=> $state->icon,
-                'url'		=> $enabled ? $url : null,
+                'label' => $state->label,
+                'icon'  => $state->icon,
+                'url'   => $enabled ? $url : null,
             );
         }
         $statusMenu['disabled'] = $model->primaryKey === null || empty($statusMenu['items']);
