@@ -43,7 +43,7 @@ class StateAction extends CAction
 
         $this->performTransition($model, $stateChange, $sourceState, $targetState, $confirmed);
 
-        $this->controller->render('fsm_confirm', array(
+        $this->render(array(
             'model'         => $model,
             'sourceState'   => $sourceState,
             'targetState'   => $targetState,
@@ -150,6 +150,21 @@ class StateAction extends CAction
         $this->controller->redirect(array('view', 'id'=>$model->id));
         Yii::app()->end();
         return true;
+    }
+
+    /**
+     * Renders the default confirmation view.
+     * @param array $params
+     */
+    public function render($params)
+    {
+        $this->controller->render('fsm_confirm', array(
+            'model'         => $model,
+            'sourceState'   => $sourceState,
+            'targetState'   => $targetState,
+            'transition'    => $stateChange['targets'][$targetState],
+            'format'        => $uiType,
+        ));
     }
 
     /**
