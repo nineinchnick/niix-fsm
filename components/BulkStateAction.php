@@ -23,7 +23,7 @@
 class BulkStateAction extends BaseBulkAction
 {
     /**
-     * @var string if null, defaults to "{modeClass}.read", set to false to skip checkAccess
+     * @var string if null, defaults to "{modeClass}.update", set to false to skip checkAccess
      */
     public $authItemTemplate = '{modelClass}.update';
     /**

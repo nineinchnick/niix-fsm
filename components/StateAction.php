@@ -34,6 +34,31 @@ class StateAction extends CAction
      */
     public function run($id, $targetState = null, $confirmed = false)
     {
+        list($model, $stateChange, $sourceState, $uiType) = $this->prepare($id);
+
+        $this->checkTransition($model, $stateChange, $sourceState, $targetState);
+
+        $model->setTransitionRules($targetState);
+        $this->controller->initForm($model);
+
+        $this->performTransition($model, $stateChange, $sourceState, $targetState, $confirmed);
+
+        $this->controller->render('fsm_confirm', array(
+            'model'         => $model,
+            'sourceState'   => $sourceState,
+            'targetState'   => $targetState,
+            'transition'    => $stateChange['targets'][$targetState],
+            'format'        => $uiType,
+        ));
+    }
+
+    /**
+     * Loads the model specified by $id and prepares some data structures.
+     * @param mixed $id
+     * @return array contains values, in order: $model(CActiveRecord), $stateChange(array), $sourceState(mixed), $uiType(string)
+     */
+    public function prepare($id)
+    {
         $model = $this->controller->loadModel($id, $this->controller->modelClass);
         $model->scenario = IStateful::SCENARIO;
         $authItem = strtr($this->stateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
@@ -51,11 +76,22 @@ class StateAction extends CAction
         $uiType = $model->uiType($stateAttribute);
         $sourceState = $model->$stateAttribute;
         if (!isset($stateChanges[$sourceState])) {
-            $stateChanges[$sourceState] = array('state' => null, 'targets' => array());
+            $stateChange = array('state' => null, 'targets' => array());
+        } else {
+            $stateChange = $stateChanges[$sourceState];
         }
+        return array($model, $stateChange, $sourceState, $uiType);
+    }
 
-        $this->controller->initForm($model);
-
+    /**
+     * May render extra views for special cases and checks permissions.
+     * @param CActiveRecord $model
+     * @param array $stateChange
+     * @param mixed $sourceState
+     * @param string $targetState
+     */
+    public function checkTransition($model, $stateChange, $sourceState, $targetState)
+    {
         if ($targetState === null) {
             // display all possible state transitions to select from
             $this->controller->render('fsm_state', array(
@@ -64,61 +100,70 @@ class StateAction extends CAction
                 'states'        => $this->prepareStates($model),
             ));
             Yii::app()->end();
-        } else if ((!is_callable($this->isAdminCallback) || !call_user_func($this->isAdminCallback)) && !isset($stateChanges[$sourceState]['targets'][$targetState])) {
-            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
-            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
-            throw new CHttpException(400, Yii::t('app', 'Changing application status from {from} to {to} is not allowed.', array('{from}'=>$sourceLabel,'{to}'=>$targetLabel)));
-        } else if (isset($stateChanges[$sourceState]['state']->auth_item_name) && !Yii::app()->user->checkAccess($stateChanges[$sourceState]['state']->auth_item_name, array('model'=>$model))) {
-            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($stateAttribute));
-            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($stateAttribute));
-            throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array('{from}'=>$sourceLabel, '{to}'=>$targetLabel)));
+        } else if ((!is_callable($this->isAdminCallback) || !call_user_func($this->isAdminCallback)) && !isset($stateChange['targets'][$targetState])) {
+            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($model->stateAttributeName));
+            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($model->stateAttributeName));
+            throw new CHttpException(400, Yii::t('app', 'Changing status from {from} to {to} is not allowed.', array(
+                '{from}' => $sourceLabel,
+                '{to}' => $targetLabel,
+            )));
+        } else if (isset($stateChange['state']->auth_item_name) && !Yii::app()->user->checkAccess($stateChange['state']->auth_item_name, array('model'=>$model))) {
+            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($model->stateAttributeName));
+            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($model->stateAttributeName));
+            throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array(
+                '{from}' => $sourceLabel,
+                '{to}' => $targetLabel,
+            )));
         }
+    }
 
-        $model->setTransitionRules($targetState);
-
+    /**
+     * Perform last checks and the actual state transition.
+     * @param CActiveRecord $model
+     * @param array $stateChange
+     * @param mixed $sourceState
+     * @param string $targetState
+     * @param boolean $confirmed
+     * @return boolean true if state transition has been performed
+     */
+    public function performTransition($model, $stateChange, $sourceState, $targetState, $confirmed)
+    {
         if ($targetState === $sourceState) {
-            Yii::app()->user->setFlash('error', Yii::t('app', 'Status has already been changed').', '.CHtml::link(Yii::t('app','return to'), $this->createUrl('view', array('id'=>$model->id))));
-        } elseif ($confirmed && $model->isTransitionAllowed($targetState)) {
-            $oldAttributes = $model->getAttributes();
-            $data = $this->controller->processForm($model);
-            // explicitly assign the new state value to avoid forcing the state attribute to be safe
-            $model->{$model->getStateAttributeName()} = $targetState;
-
-            if (($ret = $model->performTransition($oldAttributes, $data))) {
-                Yii::app()->user->setFlash('success', $stateChanges[$sourceState]['targets'][$targetState]->post_label);
-                $this->controller->redirect(array('view', 'id'=>$model->id));
-                Yii::app()->end();
-            }
-
-            if ($ret === false) {
-                Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
-            }
+            $message = Yii::t('app', 'Status has already been changed').', '.CHtml::link(Yii::t('app','return to'), $this->createUrl('view', array('id'=>$model->primaryKey)));
+            Yii::app()->user->setFlash('error', $message);
+            return false;
+        }
+        if (!$confirmed || !$model->isTransitionAllowed($targetState)) {
+            return false;
         }
 
-        $this->controller->render('fsm_confirm', array(
-            'model'         => $model,
-            'sourceState'   => $sourceState,
-            'targetState'   => $targetState,
-            'transition'    => $stateChanges[$sourceState]['targets'][$targetState],
-            'format'        => $uiType,
-        ));
+        $oldAttributes = $model->getAttributes();
+        $data = $this->controller->processForm($model);
+        // explicitly assign the new state value to avoid forcing the state attribute to be safe
+        $model->{$model->getStateAttributeName()} = $targetState;
+
+        if ($model->performTransition($oldAttributes, $data) === false) {
+            Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
+            return false;
+        }
+        Yii::app()->user->setFlash('success', $stateChange['targets'][$targetState]->post_label);
+        $this->controller->redirect(array('view', 'id'=>$model->id));
+        Yii::app()->end();
+        return true;
     }
 
     /**
      * Builds an array containing all possible status changes and result of validating every transition.
      * @params mixed $model
-     * @return array contains in order: (array)statuses, (boolean)valid
+     * @return array
      */
     public function prepareStates($model)
     {
         $checkedAccess = array();
-        if ($this->updateAuthItemTemplate !== null) {
-            $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
-            $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
-        }
         $result = array();
         if ($this->updateAuthItemTemplate !== null) {
             $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
+            $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
             $result[] = array(
                 'label' => Yii::t('app', 'Update item'),
                 'icon' => 'pencil',
