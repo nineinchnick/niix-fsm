@@ -168,6 +168,25 @@ class StateAction extends CAction
     }
 
     /**
+     * Creates url params for a route to specific state transition.
+     * @param StateTransition $state
+     * @param mixed $primaryKey
+     * @param string $targetState
+     * @param boolean is the url going to be used in a context menu
+     * @return array url params to be used with a route
+     */
+    public function getUrlParams($state, $primaryKey, $targetState, $contextMenu = false)
+    {
+        $urlParams = array('id' => $primaryKey, 'targetState' => $targetState);
+        if (!$state->confirmation_required) {
+            $urlParams['confirmed'] = true;
+        } else {
+            $urlParams['return'] = $this->id;
+        }
+        return $urlParams;
+    }
+
+    /**
      * Builds an array containing all possible status changes and result of validating every transition.
      * @params mixed $model
      * @return array
@@ -210,12 +229,6 @@ class StateAction extends CAction
 
             $valid = !$enabled || $model->isTransitionAllowed($targetState);
 
-            $urlParams = array('id' => $model->id, 'targetState' => $targetState);
-            if (!$state->confirmation_required) {
-                $urlParams['confirmed'] = true;
-            } else {
-                $urlParams['return'] = $this->id;
-            }
             $entry = array(
                 'post'      => $state->post_label,
                 'label'     => $sources[$sourceState]->label,
@@ -224,7 +237,7 @@ class StateAction extends CAction
                 'target'    => $targetState,
                 'enabled'   => $enabled && $valid,
                 'valid'     => $valid,
-                'url'       => $this->controller->createUrl($this->id, $urlParams),
+                'url'       => $this->controller->createUrl($this->id, $this->getUrlParams($state, $model->primaryKey, $targetState)),
             );
             if ($state->display_order) {
                 $result[$state->display_order] = $entry;
@@ -238,7 +251,7 @@ class StateAction extends CAction
 
     /**
      * Builds a menu item used in the context menu.
-     * @param string $action target action
+     * @param StateAction $action target action
      * @param array $transitions obtained by getGroupedByTarget()
      * @param mixed $model target model
      * @param mixed $sourceState current value of the state attribute
@@ -271,7 +284,7 @@ class StateAction extends CAction
                     $enabled = ($enabled === null || $enabled) && $status;
                 //}
             }
-            $url = array('state', 'id' => $model->primaryKey, 'targetState' => $targetState);
+            $url = array_merge(array($action->id), $action->getUrlParams($state, $model->primaryKey, $targetState, true));
             $statusMenu['items'][] = array(
                 'label' => $state->label,
                 'icon'  => $state->icon,
