@@ -146,7 +146,10 @@ class StateAction extends CAction
             Yii::app()->user->setFlash('error', Yii::t('app', 'Failed to save changes.'));
             return false;
         }
-        Yii::app()->user->setFlash('success', $stateChange['targets'][$targetState]->post_label);
+        if (isset($stateChange['targets'][$targetState])) {
+            // $stateChange['targets'][$targetState] may not be set when user is admin
+            Yii::app()->user->setFlash('success', $stateChange['targets'][$targetState]->post_label);
+        }
         $this->controller->redirect(array('view', 'id'=>$model->id));
         Yii::app()->end();
         return true;
