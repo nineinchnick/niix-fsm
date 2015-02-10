@@ -75,8 +75,7 @@ class StateAction extends CAction
         $this->controller->initForm($model);
 
         if ($this->performTransition($model, $stateChange, $sourceState, $targetState, $confirmed)) {
-            $this->controller->redirect(array('view', 'id'=>$model->id));
-            Yii::app()->end();
+            $this->afterTransition($model);
         }
 
         $this->render(array(
@@ -174,6 +173,16 @@ class StateAction extends CAction
             Yii::app()->user->setFlash('success', $stateChange['targets'][$targetState]->post_label);
         }
         return true;
+    }
+
+    /**
+     * Called after successfuly executing performTransition.
+     * @param CActiveRecord $model
+     */
+    public function afterTransition($model)
+    {
+        $this->controller->redirect(array('view', 'id'=>$model->id));
+        Yii::app()->end();
     }
 
     /**
