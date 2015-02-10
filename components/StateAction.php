@@ -30,18 +30,54 @@ class StateAction extends CAction
     public $isAdminCallback;
 
     /**
+     * Configures stateAuthItemTemplate and updateAuthItemTemplate properties.
+     *
+     * @param string $controller
+     * @param string $id
+     */
+    public function __construct($controller, $id)
+    {
+        parent::__construct($controller, $id);
+
+        if (is_string($this->stateAuthItemTemplate)) {
+            $this->stateAuthItemTemplate = strtr($this->stateAuthItemTemplate, array(
+                '{modelClass}' => $this->controller->authModelClass,
+            ));
+        }
+        if (is_string($this->updateAuthItemTemplate)) {
+            $this->updateAuthItemTemplate = strtr($this->updateAuthItemTemplate, array(
+                '{modelClass}' => $this->controller->authModelClass,
+            ));
+        }
+    }
+
+    /**
      * Runs the action.
      */
     public function run($id, $targetState = null, $confirmed = false)
     {
-        list($model, $stateChange, $sourceState, $uiType) = $this->prepare($id);
+        $model = $this->controller->loadModel($id, $this->controller->modelClass);
+        if ($this->controller->checkAccessInActions && !Yii::app()->user->checkAccess($this->stateAuthItemTemplate, array('model'=>$model))) {
+            throw new CHttpException(403, Yii::t('app','You are not authorized to perform this action on this object.'));
+        }
+        $model->scenario = IStateful::SCENARIO;
+        list($stateChange, $sourceState, $uiType) = $this->prepare($model);
 
         $this->checkTransition($model, $stateChange, $sourceState, $targetState);
+        if (isset($stateChange['state']->auth_item_name) && !Yii::app()->user->checkAccess($stateChange['state']->auth_item_name, array('model'=>$model))) {
+            throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array(
+                '{from}' => Yii::app()->format->format($sourceState, $model->uiType($model->stateAttributeName)),
+                '{to}' => Yii::app()->format->format($targetState, $model->uiType($model->stateAttributeName)),
+            )));
+        }
 
         $model->setTransitionRules($targetState);
         $this->controller->initForm($model);
 
-        $this->performTransition($model, $stateChange, $sourceState, $targetState, $confirmed);
+        if ($this->performTransition($model, $stateChange, $sourceState, $targetState, $confirmed)) {
+            $this->controller->redirect(array('view', 'id'=>$model->id));
+            Yii::app()->end();
+        }
 
         $this->render(array(
             'model'         => $model,
@@ -49,25 +85,21 @@ class StateAction extends CAction
             'targetState'   => $targetState,
             'transition'    => $stateChange['targets'][$targetState],
             'format'        => $uiType,
+            'stateActionUrl'=> $this->controller->createUrl($this->id),
         ));
     }
 
     /**
      * Loads the model specified by $id and prepares some data structures.
-     * @param mixed $id
-     * @return array contains values, in order: $model(CActiveRecord), $stateChange(array), $sourceState(mixed), $uiType(string)
+     * @param CActiveRecord $model
+     * @return array contains values, in order: $stateChange(array), $sourceState(mixed), $uiType(string)
      */
-    public function prepare($id)
+    public function prepare($model)
     {
-        $model = $this->controller->loadModel($id, $this->controller->modelClass);
-        $model->scenario = IStateful::SCENARIO;
-        $authItem = strtr($this->stateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
-        if ($this->controller->checkAccessInActions && !Yii::app()->user->checkAccess($authItem, array('model'=>$model))) {
-            throw new CHttpException(403,Yii::t('app','You are not authorized to perform this action on this object.'));
-        }
-
         if (!$model instanceof IStateful) {
-            throw new CHttpException(500,Yii::t('app', 'Model {model} needs to implement the IStateful interface.', array('{model}'=>$this->controller->modelClass)));
+            throw new CHttpException(500, Yii::t('app', 'Model {model} needs to implement the IStateful interface.', array(
+                '{model}'=>$this->controller->modelClass
+            )));
         }
         $stateAttribute = $model->stateAttributeName;
         $stateChanges = $model->getTransitionsGroupedBySource();
@@ -80,7 +112,7 @@ class StateAction extends CAction
         } else {
             $stateChange = $stateChanges[$sourceState];
         }
-        return array($model, $stateChange, $sourceState, $uiType);
+        return array($stateChange, $sourceState, $uiType);
     }
 
     /**
@@ -101,18 +133,9 @@ class StateAction extends CAction
             ));
             Yii::app()->end();
         } else if ((!is_callable($this->isAdminCallback) || !call_user_func($this->isAdminCallback)) && !isset($stateChange['targets'][$targetState])) {
-            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($model->stateAttributeName));
-            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($model->stateAttributeName));
             throw new CHttpException(400, Yii::t('app', 'Changing status from {from} to {to} is not allowed.', array(
-                '{from}' => $sourceLabel,
-                '{to}' => $targetLabel,
-            )));
-        } else if (isset($stateChange['state']->auth_item_name) && !Yii::app()->user->checkAccess($stateChange['state']->auth_item_name, array('model'=>$model))) {
-            $sourceLabel = Yii::app()->format->format($sourceState, $model->uiType($model->stateAttributeName));
-            $targetLabel = Yii::app()->format->format($targetState, $model->uiType($model->stateAttributeName));
-            throw new CHttpException(400, Yii::t('app', 'You don\'t have necessary permissions to move the application from {from} to {to}.', array(
-                '{from}' => $sourceLabel,
-                '{to}' => $targetLabel,
+                '{from}' => Yii::app()->format->format($sourceState, $model->uiType($model->stateAttributeName)),
+                '{to}' => Yii::app()->format->format($targetState, $model->uiType($model->stateAttributeName)),
             )));
         }
     }
@@ -150,8 +173,6 @@ class StateAction extends CAction
             // $stateChange['targets'][$targetState] may not be set when user is admin
             Yii::app()->user->setFlash('success', $stateChange['targets'][$targetState]->post_label);
         }
-        $this->controller->redirect(array('view', 'id'=>$model->id));
-        Yii::app()->end();
         return true;
     }
 
@@ -161,13 +182,7 @@ class StateAction extends CAction
      */
     public function render($params)
     {
-        $this->controller->render('fsm_confirm', array(
-            'model'         => $model,
-            'sourceState'   => $sourceState,
-            'targetState'   => $targetState,
-            'transition'    => $stateChange['targets'][$targetState],
-            'format'        => $uiType,
-        ));
+        $this->controller->render('fsm_confirm', $params);
     }
 
     /**
@@ -199,14 +214,14 @@ class StateAction extends CAction
         $checkedAccess = array();
         $result = array();
         if ($this->updateAuthItemTemplate !== null) {
-            $authItem = strtr($this->updateAuthItemTemplate, array('{modelClass}'=>$this->controller->authModelClass));
+            $authItem = $this->updateAuthItemTemplate;
             $checkedAccess[$authItem] = Yii::app()->user->checkAccess($authItem, array('model'=>$model));
             $result[] = array(
-                'label' => Yii::t('app', 'Update item'),
-                'icon' => 'pencil',
-                'url' => $this->controller->createUrl('update', array('id' => $model->getPrimaryKey())),
+                'label'   => Yii::t('app', 'Update item'),
+                'icon'    => 'pencil',
+                'url'     => $this->controller->createUrl('update', array('id' => $model->getPrimaryKey())),
                 'enabled' => $checkedAccess[$authItem],
-                'class' => 'btn btn-success',
+                'class'   => 'btn btn-success',
             );
         }
         $valid = true;
