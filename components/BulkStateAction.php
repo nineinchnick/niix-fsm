@@ -37,7 +37,7 @@ class BulkStateAction extends BaseBulkAction
     /**
      * @var string Class name of state action used to perform single operations.
      */
-    public $stateActionClass = 'niix-fsm.components.StateAction';
+    public $stateActionClass = 'fsm.components.StateAction';
     /**
      * @var boolean Is the job run in a single query.
      */
@@ -118,8 +118,9 @@ class BulkStateAction extends BaseBulkAction
     /**
      * Renders a form and/or confirmation.
      */
-    public function prepare($targetState = null)
+    public function prepare()
     {
+        $targetState = Yii::app()->request->getParam('targetState');
         $model = new $this->controller->modelClass;
         $model->scenario = IStateful::SCENARIO;
         $model->{$model->stateAttributeName} = $this->getSourceState($model);
@@ -143,8 +144,11 @@ class BulkStateAction extends BaseBulkAction
     /**
      * Performs state changes.
      */
-    public function runBatch($targetState)
+    public function runBatch()
     {
+        if (($targetState = Yii::app()->request->getParam('targetState')) === null) {
+            throw new CHttpException(400, Yii::t('yii','Your request is invalid.'));
+        }
         $baseModel = new $this->controller->modelClass;
         $baseModel->scenario = IStateful::SCENARIO;
         $baseModel->{$baseMdel->stateAttributeName} = $this->getSourceState($baseMdel);
