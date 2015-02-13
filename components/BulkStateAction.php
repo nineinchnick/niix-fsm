@@ -104,8 +104,7 @@ class BulkStateAction extends BaseBulkAction
     protected function getSourceState($model)
     {
         $criteria = $this->getCriteria();
-        $criteria->select = $this->quoteColumn('t', $model->stateAttributeName);
-        $criteria->distinct = true;
+        $criteria->select = 'COUNT(DISTINCT '.$model->dbConnection->quoteColumnName('t.'.$model->stateAttributeName).') as t0_c0';
         $finder = new EActiveFinder($model, is_array($criteria->with) ? $criteria->with : array());
         $command = $finder->createCommand($criteria);
         $sourceStates = $command->queryColumn();
