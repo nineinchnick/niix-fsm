@@ -13,6 +13,8 @@
  * * call StateAction::getContextMenuItem when building the context menu in CRUD controller
  *
  * @author Jan Was <jwas@nets.com.pl>
+ * @property $stateAuthItemTemplate string
+ * @property $updateAuthItemTemplate string
  */
 class StateAction extends CAction
 {
@@ -28,6 +30,46 @@ class StateAction extends CAction
      * @var callable a closure to check if current user is a superuser and authorization should be skipped
      */
     public $isAdminCallback;
+
+    /**
+     * @param string $controller
+     * @param string $id
+     */
+    public function __construct($controller, $id)
+    {
+        parent::__construct($controller, $id);
+        if (!$controller instanceof NetController) {
+            throw new CException('Invalid configuration - BulkAction can only be used in a NetController.');
+        }
+    }
+
+    public function setStateAuthItemTemplate($authTemplate)
+    {
+        if (is_string($authTemplate)) {
+            $this->_stateAuthItemTemplate = strtr($authTemplate, array(
+                '{modelClass}' => $this->controller->authModelClass,
+            ));
+        }
+    }
+
+    public function getStateAuthItemTemplate()
+    {
+        return $this->_stateAuthItemTemplate;
+    }
+
+    public function setUpdateAuthItemTemplate($authTemplate)
+    {
+        if (is_string($authTemplate)) {
+            $this->_updateAuthItemTemplate = strtr($authTemplate, array(
+                '{modelClass}' => $this->controller->authModelClass,
+            ));
+        }
+    }
+
+    public function getUpdateAuthItemTemplate()
+    {
+        return $this->_updateAuthItemTemplate;
+    }
 
     /**
      * Runs the action.
@@ -298,36 +340,6 @@ class StateAction extends CAction
         }
         $statusMenu['disabled'] = $model->primaryKey === null || empty($statusMenu['items']);
         return $statusMenu;
-    }
-
-    public function setStateAuthItemTemplate($authTemplate)
-    {
-        if (!is_string($authTemplate))
-            return;
-
-        $this->_stateAuthItemTemplate = strtr($authTemplate, array(
-            '{modelClass}' => $this->controller->authModelClass,
-        ));
-    }
-
-    public function getStateAuthItemTemplate()
-    {
-        return $this->_stateAuthItemTemplate;
-    }
-
-    public function setUpdateAuthItemTemplate($authTemplate)
-    {
-        if (!is_string($authTemplate))
-            return;
-
-        $this->_updateAuthItemTemplate = strtr($authTemplate, array(
-            '{modelClass}' => $this->controller->authModelClass,
-        ));
-    }
-
-    public function getUpdateAuthItemTemplate()
-    {
-        return $this->_updateAuthItemTemplate;
     }
 }
 

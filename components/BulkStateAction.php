@@ -19,17 +19,20 @@
  * </pre>
  *
  * @author jwas
+ * @property $stateAuthItemTemplate string
+ * @property $updateAuthItemTemplate string
+ * @property $stateAction CAction
  */
 class BulkStateAction extends BaseBulkAction
 {
     /**
      * @var string Prefix of the auth item used to check access. Controller's $authModelClass is appended to it.
      */
-    public $stateAuthItemTemplate = '{modelClass}.update';
+    protected $_stateAuthItemTemplate = '{modelClass}.update';
     /**
      * @var string Auth item used to check access to update the main model. If null, the update button won't be available.
      */
-    public $updateAuthItemTemplate;
+    protected $_updateAuthItemTemplate;
     /**
      * @var callable A closure to check if current user is a superuser and authorization should be skipped.
      */
@@ -62,35 +65,50 @@ class BulkStateAction extends BaseBulkAction
      */
     private $_stateAction;
 
-    /**
-     * Configures authItemTemplate property.
-     *
-     * @param string $controller
-     * @param string $id
-     */
-    public function __construct($controller, $id)
+    public function setStateAuthItemTemplate($authTemplate)
     {
-        parent::__construct($controller, $id);
+        if (is_string($authTemplate)) {
+            $this->_stateAuthItemTemplate = strtr($authTemplate, array(
+                '{modelClass}' => $this->controller->authModelClass,
+            ));
+        }
+    }
 
-        if ($this->singleQuery) {
-            throw new CException('Not implemented - the singleQuery option has not been implemented yet.');
-        }
-        if (is_string($this->stateAuthItemTemplate)) {
-            $this->stateAuthItemTemplate = strtr($this->stateAuthItemTemplate, array(
+    public function getStateAuthItemTemplate()
+    {
+        return $this->_stateAuthItemTemplate;
+    }
+
+    public function setUpdateAuthItemTemplate($authTemplate)
+    {
+        if (is_string($authTemplate)) {
+            $this->_updateAuthItemTemplate = strtr($authTemplate, array(
                 '{modelClass}' => $this->controller->authModelClass,
             ));
         }
-        if (is_string($this->updateAuthItemTemplate)) {
-            $this->updateAuthItemTemplate = strtr($this->updateAuthItemTemplate, array(
-                '{modelClass}' => $this->controller->authModelClass,
-            ));
+    }
+
+    public function getUpdateAuthItemTemplate()
+    {
+        return $this->_updateAuthItemTemplate;
+    }
+
+    public function setStateAction($action)
+    {
+        $this->_stateAction = $action;
+    }
+
+    public function getStateAction()
+    {
+        if ($this>_stateAction === null) {
+            $this->_stateAction = Yii::createComponent(array(
+                'class' => $this->stateActionClass,
+                'stateAuthItemTemplate' => $this->stateAuthItemTemplate,
+                'updateAuthItemTemplate' => $this->updateAuthItemTemplate,
+                'isAdminCallback' => $this->isAdminCallback,
+            ), $controller, $id);
         }
-        $this->_stateAction = Yii::createComponent(array(
-            'class' => $this->stateActionClass,
-            'stateAuthItemTemplate' => $this->stateAuthItemTemplate,
-            'updateAuthItemTemplate' => $this->updateAuthItemTemplate,
-            'isAdminCallback' => $this->isAdminCallback,
-        ), $controller, $id);
+        return $this->_stateAction;
     }
 
     /**
@@ -123,14 +141,14 @@ class BulkStateAction extends BaseBulkAction
         $model = new $this->controller->modelClass;
         $model->scenario = IStateful::SCENARIO;
         $model->{$model->stateAttributeName} = $this->getSourceState($model);
-        list($stateChange, $sourceState, $uiType) = $this->_stateAction->prepare($model);
+        list($stateChange, $sourceState, $uiType) = $this->stateAction->prepare($model);
 
-        $this->_stateAction->checkTransition($model, $stateChange, $sourceState, $targetState);
+        $this->stateAction->checkTransition($model, $stateChange, $sourceState, $targetState);
 
         $model->setTransitionRules($targetState);
         $this->controller->initForm($model);
 
-        $this->_stateAction->render(array(
+        $this->stateAction->render(array(
             'model'         => $model,
             'sourceState'   => $sourceState,
             'targetState'   => $targetState,
@@ -151,10 +169,13 @@ class BulkStateAction extends BaseBulkAction
         $baseModel = new $this->controller->modelClass;
         $baseModel->scenario = IStateful::SCENARIO;
         $baseModel->{$baseMdel->stateAttributeName} = $this->getSourceState($baseMdel);
-        list($stateChange, $sourceState, $uiType) = $this->_stateAction->prepare($baseModel);
+        list($stateChange, $sourceState, $uiType) = $this->stateAction->prepare($baseModel);
 
         if ($this->singleTransaction) {
             $trx = $baseModel->dbConnection->currentTransaction === null ? $baseModel->dbConnection->beginTransaction() : null;
+        }
+        if ($this->singleQuery) {
+            throw new CException('Not implemented - the singleQuery option has not been implemented yet.');
         }
         $dataProvider = $this->getDataProvider($baseModel, $this->getCriteria());
         $skippedKeys = array();
@@ -167,7 +188,7 @@ class BulkStateAction extends BaseBulkAction
             $model->setTransitionRules($targetState);
             $this->controller->initForm($model);
 
-            if (!$this->_stateAction->performTransition($model, $stateChange, $sourceState, $targetState, true)) {
+            if (!$this->stateAction->performTransition($model, $stateChange, $sourceState, $targetState, true)) {
                 //! @todo errors should be gathered and displayed somewhere, maybe add a postSummary action in this class
                 $failedKeys[] = $model->primaryKey;
             }
