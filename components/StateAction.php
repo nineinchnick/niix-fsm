@@ -19,37 +19,15 @@ class StateAction extends CAction
     /**
      * @var string Prefix of the auth item used to check access. Controller's $authModelClass is appended to it.
      */
-    public $stateAuthItemTemplate = '{modelClass}.update';
+    protected $_stateAuthItemTemplate = '{modelClass}.update';
     /**
      * @var string Auth item used to check access to update the main model. If null, the update button won't be available.
      */
-    public $updateAuthItemTemplate;
+    protected $_updateAuthItemTemplate;
     /**
      * @var callable a closure to check if current user is a superuser and authorization should be skipped
      */
     public $isAdminCallback;
-
-    /**
-     * Configures stateAuthItemTemplate and updateAuthItemTemplate properties.
-     *
-     * @param string $controller
-     * @param string $id
-     */
-    public function __construct($controller, $id)
-    {
-        parent::__construct($controller, $id);
-
-        if (is_string($this->stateAuthItemTemplate)) {
-            $this->stateAuthItemTemplate = strtr($this->stateAuthItemTemplate, array(
-                '{modelClass}' => $this->controller->authModelClass,
-            ));
-        }
-        if (is_string($this->updateAuthItemTemplate)) {
-            $this->updateAuthItemTemplate = strtr($this->updateAuthItemTemplate, array(
-                '{modelClass}' => $this->controller->authModelClass,
-            ));
-        }
-    }
 
     /**
      * Runs the action.
@@ -320,6 +298,36 @@ class StateAction extends CAction
         }
         $statusMenu['disabled'] = $model->primaryKey === null || empty($statusMenu['items']);
         return $statusMenu;
+    }
+
+    public function setStateAuthItemTemplate($authTemplate)
+    {
+        if (!is_string($authTemplate))
+            return;
+
+        $this->_stateAuthItemTemplate = strtr($authTemplate, array(
+            '{modelClass}' => $this->controller->authModelClass,
+        ));
+    }
+
+    public function getStateAuthItemTemplate()
+    {
+        return $this->_stateAuthItemTemplate;
+    }
+
+    public function setUpdateAuthItemTemplate($authTemplate)
+    {
+        if (!is_string($authTemplate))
+            return;
+
+        $this->_updateAuthItemTemplate = strtr($authTemplate, array(
+            '{modelClass}' => $this->controller->authModelClass,
+        ));
+    }
+
+    public function getUpdateAuthItemTemplate()
+    {
+        return $this->_updateAuthItemTemplate;
     }
 }
 
