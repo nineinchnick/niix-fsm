@@ -100,13 +100,13 @@ class BulkStateAction extends BaseBulkAction
 
     public function getStateAction()
     {
-        if ($this>_stateAction === null) {
+        if ($this->_stateAction === null) {
             $this->_stateAction = Yii::createComponent(array(
                 'class' => $this->stateActionClass,
                 'stateAuthItemTemplate' => $this->stateAuthItemTemplate,
                 'updateAuthItemTemplate' => $this->updateAuthItemTemplate,
                 'isAdminCallback' => $this->isAdminCallback,
-            ), $controller, $id);
+            ), $this->controller, $this->id);
         }
         return $this->_stateAction;
     }
@@ -122,7 +122,8 @@ class BulkStateAction extends BaseBulkAction
     protected function getSourceState($model)
     {
         $criteria = $this->getCriteria();
-        $criteria->select = 'COUNT(DISTINCT '.$model->dbConnection->quoteColumnName('t.'.$model->stateAttributeName).') as t0_c0';
+        $criteria->select = $model->dbConnection->quoteColumnName('t.'.$model->stateAttributeName).' as t0_c0';
+        $criteria->distinct = true;
         $finder = new EActiveFinder($model, is_array($criteria->with) ? $criteria->with : array());
         $command = $finder->createCommand($criteria);
         $sourceStates = $command->queryColumn();
