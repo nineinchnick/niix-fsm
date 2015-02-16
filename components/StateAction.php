@@ -217,14 +217,14 @@ class StateAction extends CAction
     /**
      * Creates url params for a route to specific state transition.
      * @param StateTransition $state
-     * @param mixed $primaryKey
+     * @param CActiveRecord $model
      * @param string $targetState
      * @param boolean is the url going to be used in a context menu
      * @return array url params to be used with a route
      */
-    public function getUrlParams($state, $primaryKey, $targetState, $contextMenu = false)
+    public function getUrlParams($state, $model, $targetState, $contextMenu = false)
     {
-        $urlParams = array('id' => $primaryKey, 'targetState' => $targetState);
+        $urlParams = array('id' => $model->primaryKey, 'targetState' => $targetState);
         if (!$state->confirmation_required) {
             $urlParams['confirmed'] = true;
         } else {
@@ -284,7 +284,7 @@ class StateAction extends CAction
                 'target'    => $targetState,
                 'enabled'   => $enabled && $valid,
                 'valid'     => $valid,
-                'url'       => $this->controller->createUrl($this->id, $this->getUrlParams($state, $model->primaryKey, $targetState)),
+                'url'       => $this->controller->createUrl($this->id, $this->getUrlParams($state, $model, $targetState)),
             );
             if ($state->display_order) {
                 $result[$state->display_order] = $entry;
@@ -331,7 +331,7 @@ class StateAction extends CAction
                     $enabled = ($enabled === null || $enabled) && $status;
                 //}
             }
-            $url = array_merge(array($action->id), $action->getUrlParams($state, $model->primaryKey, $targetState, true));
+            $url = array_merge(array($action->id), $action->getUrlParams($state, $model, $targetState, true));
             $statusMenu['items'][] = array(
                 'label' => $state->label,
                 'icon'  => $state->icon,
